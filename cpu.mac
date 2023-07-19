@@ -10,6 +10,7 @@ START:	mtps	#200
 	mov	#1000, SP
 
 	; clear screen
+	mov	#1330, @#177664		; scroll screen to 0
 	mov	#40000, R5
 	mov	#20000, R3
 	clr	(R5)+
@@ -291,9 +292,11 @@ MainCheckOver:
 10$:	; draw 'game over'
 	mov	#8.*5.+Stakan, R0
 	mov	#GamoverTiles, R1
-	mov	#12., R3
-	mov	(R1)+, (R0)+
-	sob	R3, .-2
+	mov	#24., R3
+20$:	movb	(R1)+, R2
+	sub	TilesAddition, R2
+	movb	R2, (R0)+
+	sob	R3, 20$
 	call	RedrawStakan
 	; wait for keypress
 	clr	KeySpace
@@ -546,19 +549,23 @@ GetScore:
 ; key 1 - Tiles addition switch
 CheckTilesAddition:
 	tst	Key1
-	bne	10$
-	return
-10$:	clr	Key1
+	beq	99$
+	clr	Key1	
 	tst	TilesAddition
-	beq	20$
-	clr	TilesAddition
+	bne	10$
+	mov	#6., TilesAddition
 	br	90$
-20$:	mov	#6., TilesAddition
-90$:	cmp	CurrentMode, #1.	; if not at 'awaiting start'
+10$:	cmp	#6., TilesAddition
+	bne	20$
+	mov	#12., TilesAddition
+	br	90$
+20$:	clr	TilesAddition
+	; redraw stakan/next (stakan only if not at awaiting start mode)
+90$:	cmp	CurrentMode, #1.
 	beq	92$
 	call	RedrawStakan
 92$:	call	DrawNext
-	return
+99$:	return
 
 
 ; debug info
@@ -749,7 +756,7 @@ KeysEnd:
 
 GamoverTiles:
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
-	.byte	0, 20., 21., 22., 23., 0
+	.byte	0, 20., 21., 22., 23., 0, 0, 0
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
 	.even
 
