@@ -1,11 +1,9 @@
 <?php
-
-    $img = imagecreatefrompng('./graphics/bridge.png');
+    $img = imagecreatefrompng('./graphics/onoff.png');
     $width = imagesx($img);
     $height = imagesy($img);
     echo "Image: $width x $height\n";
     $bytes_dx = intval($width / 4);	// BK byte is 4pix in color mode
-    echo "Bytes original: ".($bytes_dx*3*$height)."\n";
     
     // tiles array
     $bgrArray = Array();
@@ -40,37 +38,14 @@
     
     ////////////////////////////////////////////////////////////////////////////
     
-    echo "Writing CPU uncompressed BGR data ...\n";
-    $f = fopen ("_cpu_bgr.dat", "w");
+    $f = fopen("inc_onoff.mac", "w");
+    fputs($f, "SprOnOff:\n");
+    $n = 0;
     for ($i=0; $i<count($bgrArray); $i++)
     {
+	if ($i==90) fputs($f, "SprOffOn:\n");
+	if ($n==0) fputs($f, "\t.byte\t");
         $b = $bgrArray[$i] &0xFF;
-        fwrite($f, chr($b), 1);
+        fputs($f, decoct($b)); if ($n<8) { fputs($f, ", "); $n++; } else { fputs($f, "\n"); $n=0; }
     }
     fclose($f);
-
-    // packing
-    exec("..\scripts\zx0.exe -f -q _cpu_bgr.dat _cpu_bgr_lz.dat");
-    
-function WriteMacFile ( $in_fname, $out_fname, $name )
-{
-    $f = fopen($in_fname, "rb");
-    $g = fopen($out_fname, "w");
-    $n = 0;
-    fputs($g, "$name:");
-    while (!feof($f)) {
-        $b = ord(fread($f, 1));
-        if ($n == 0) fputs($g, "\t.byte\t");
-        fputs($g, decoct($b));
-        $n++; if ($n < 16) fputs ($g, ", "); else { $n=0; fputs($g, "\n"); }
-    }
-    if ($n != 0) fputs($g, "0\n");
-    fputs($g, "\n\t.even\n");
-    fclose($f);
-    fclose($g);
-}
-
-    // write packed data to .mac files
-    WriteMacFile("_cpu_bgr_lz.dat", "inc_cpu_bgr.mac", "CpuBgr");
-
-?>

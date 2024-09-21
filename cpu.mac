@@ -1,36 +1,35 @@
 	.title	CPU
 	.enabl	LC, AMA
-	.list	MEB
+
 	.asect
+	.=1000
 
 @include inc_common.mac
 
-.=1000
-START:	mtps	#200
+Start:	mtps	#200
 	mov	#1000, SP
+	mov	SP, @#4
 
-	; clear screen
-	mov	#1330, @#177664		; scroll screen to 0
-	mov	#40000, R5
-	mov	#20000, R3
-	clr	(R5)+
-	sob	R3, .-2
+	; check for BK-0011(M)
+	cmpb	@#177717, #200
+	beq	10$
+	mov	#C_RAM_BANKS56, @#177716	; (for 11M) - RAM banks 5,6
+	clr	@#177662			; (for 11M) - current screen buf 5
 
-	clr	CurrentMode
-	call	DrawBackground
-
-	mov	#StpInt, @#4
-	mov	#200, @#6
+10$:	mov	#1330, @#177664			; scroll screen to 0
 
 	mov	#KbdInt, @#60
-	bic	#^B01000000, @#177660	; allow keyboard interrupt
+	mov	#Ap2Int, @#274
+	mov	#NoInt, @#100
+	bic	#^B01000000, @#177660		; allow keyboard interrupt
 
+	clr	CurrentMode
 	mtps	#0
 
-; well, now let's play a game
+
+; well, now let's play
 MainCycle:
 	call	TimerInit
-	call	CheckStop
 	call	CheckTilesAddition
 	; run procedures
 	mov	CurrentMode, R0
@@ -41,6 +40,7 @@ MainCycle:
 	; debug output
 	; call	DebugInfo
 	jmp	MainCycle
+
 
 MainCycleTable:	
 	.word	MainReset		; 00. - reset
@@ -56,6 +56,7 @@ MainCycleTable:
 
 ; 00 - reset anything to a new
 MainReset:
+	call	DrawBackground
 	; reset vars
 	mov	#1., Level
 	clr	Score
@@ -68,11 +69,7 @@ MainReset:
 	movb	R1, @#PalkaNext+1
 	call	Random5
 	movb	R1, @#PalkaNext+2
-	; clear stakan's
-	call	ClearStakans	
-	call	RedrawStakan
 	; print instructions and score
-	call	PrintInstr
 	call	PrintInstrOnOff
 	; next figure
 	call	DrawNext
@@ -101,9 +98,15 @@ MainAwaitStart:
 10$:	tst	Key2
 	beq	20$
 	clr	Key2
+	mov	#Snd000, CurrentSound
 	com	LevelsInc
 	call	PrintInstrOnOff
-20$:	return
+20$:	tst	Key0
+	beq	30$
+	mov	@#177716, R0
+	clrb	R0
+	jmp	(R0)
+30$:	return
 
 
 ; 02 - start new palka
@@ -551,6 +554,7 @@ CheckTilesAddition:
 	tst	Key1
 	beq	99$
 	clr	Key1	
+	mov	#Snd000, CurrentSound
 	tst	TilesAddition
 	bne	10$
 	mov	#6., TilesAddition
@@ -568,32 +572,6 @@ CheckTilesAddition:
 99$:	return
 
 
-; debug info
-DebugInfo:
-	tst	DebugMode
-	beq	99$
-	bit	#^B1111, FrameCount	; once in 16 frames
-	bne	99$
-	; print some debug info
-	mov	#64.*4.+1.+VADDR, R1
-	mov	KeyCurrent, R0
-	call	PrintBinaryWord
-	mov	#64.*4.+18.+VADDR, R1
-	mov	TimerCurrent, R0
-	call	PrintOctalWord
-99$:	return
-
-
-; key STOP - restart all
-CheckStop:
-	tst	KeyStop
-	beq	99$
-	clr	KeyStop			; release STOP
-	clr	Pause			; unpause
-	clr	CurrentMode		; reset mode
-99$:	return
-
-
 ; //////////////////////////////////////////////////////////////////////////////
 ; // UTILS 
 ; //////////////////////////////////////////////////////////////////////////////
@@ -601,11 +579,10 @@ CheckStop:
 @include inc_cpu_fonts.mac
 @include inc_cpu_utils.mac
 
-
-; 'empty' interrupt
-RtiAdr:	
+Ap2Int:	tst	@#177662
 	rti
-
+	
+NoInt:	rti
 
 TimerInit:
 	mov	#177777, @#177706
@@ -681,8 +658,6 @@ KbdInt:	mov	R0, -(SP)
 	mov	(SP)+, R0
 	rti
 
-StpInt:	inc 	KeyStop
-	rti
 
 ; //////////////////////////////////////////////////////////////////////////////
 ; // DATA
@@ -733,9 +708,10 @@ TempR4:		.word	0
 TempR5:		.word	0
 
 ; keyboard
-KeysBegin:
-		.word	0
+KeysBegin:	.word	0
 KeyCurrent:	.word	0
+		.word	^B110000
+Key0:		.word	0
 		.word	^B110001
 Key1:		.word	0
 		.word	^B110010
@@ -750,8 +726,6 @@ KeyLeft:	.word	0
 KeyRight:	.word	0
 		.word	^B100000
 KeySpace:	.word	0
-		.word	^B00000000
-KeyStop:	.word	0
 KeysEnd:
 
 GamoverTiles:

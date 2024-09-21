@@ -3,64 +3,6 @@
 ; // Printing
 ; //////////////////////////////////////////////////////////////////////////////
 
-; print binary word (4x5 font), R0-word, R1-vram addr
-PrintBinaryWord:
-	mov	R1, R5
-	mov	#SCRWID, R2
-	mov	#16., R3
-20$:	mov	#SprNumbers45, R1
-	asl	R0
-	bcc	30$
-	add	#8., R1
-30$:	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	sub	#SCRWID*4-1, R5		; advance vaddr
-	sob	R3, 20$
-	return	
- 
-; print octal word (4x5 font), R0 - word, R1-vram addr
-PrintOctalWord:
-	mov	R1, R5
-	mov	#SCRWID, R2
-	mov	#6., R3
-	; 1st bit
-	clr	R1
-	br	22$
-20$:	; get number
-	clr	R1
-	asl	R0
-	rol	R1
-	asl	R0
-	rol	R1
-22$:	asl	R0
-	rol	R1	
-	; get spr addr
-	asl	R1
-	asl	R1
-	asl	R1
-	add	#SprNumbers45, R1
-	; put bits
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	add	R2, R5
-	movb	(R1)+, (R5)
-	sub	#SCRWID*4-1, R5
-	sob	R3, 20$
-	return	 
-
-
 ; draw big digit from R0 to vaddr in R5 and advance R5
 ; DON'T SCREW R5
 DrawBigDigit:
@@ -94,44 +36,6 @@ DrawBigDigit:
 	sob	R3, 20$
 	sub	#SCRWID*15.-2, R5
 	return
-
-
-PrintScrColors:
-	.word	0, ^B0101010101010101, ^B1010101010101010, 177777
-
-; standard BK-0010 printing from RAM
-; R0 - message str, R1 - vaddr
-PrintStr:
-	mov	R0, VarAddr
-	mov	R1, TempR5
-	clrb	@#44				; no underline?	
-	clrb	@#45				; no inversion?
-	clr	@#212				; background color?
-	mov	#^B1010101010101010, @#214	; foreground color?
-10$:	movb	@VarAddr, R0
-	inc	VarAddr
-	bic	#^B1111111100000000, R0
-	beq	99$
-	; color symbol?
-	cmp	R0, #3
-	bgt	70$
-	asl	R0
-	mov	PrintScrColors(R0), @#214
-	br	10$
-70$:	; draw symbol
-	sub	#20, R0				; adjust for non-printable
-	asl	R0
-	mov	R0, R1
-	asl	R0
-	asl	R0
-	add	R0, R1
-	add	#112036, R1			; font addr
-	mov	TempR5, R3			; vaddr
-	mov	#11, R2				; DY
-	call	@#103066			; draw a symbol
-	add	#2, TempR5			; advance vaddr
-	br	10$
-99$:	return
 
 
 ; //////////////////////////////////////////////////////////////////////////////
@@ -353,141 +257,73 @@ PrintScore:
 	return
 
 
-Msg001:	.asciz	<3>"1"<1>" - "<2>"Tiles"
-Msg002:	.asciz	<3>"2"<1>" - "<2>"Levels"
-Msg003:	.asciz	<2>"On"<1>" Off"
-Msg004:	.asciz	<3>"STOP"<2>" RESET"
-Msg005:	.asciz	<3>"SPACE"<2>"  RUN"
-	.even
+@include inc_onoff.mac
 
-; print instructions
-PrintInstr:
-	mov	#Msg001, R0
-	mov	#50.*64.+22.+VADDR, R1
-	call	PrintStr
-	mov	#Msg002, R0
-	mov	#60.*64.+22.+VADDR, R1
-	call	PrintStr
-	mov	#Msg004, R0
-	mov	#90.*64.+22.+VADDR, R1
-	call	PrintStr
-	mov	#Msg005, R0
-	mov	#110.*64.+22.+VADDR, R1
-	call	PrintStr
-	return
-
+; ON - 132,94; OFF - 152,94
 PrintInstrOnOff:
+	mov	#SCRWID*94.+33.+VADDR, R0
+	mov	#SprOnOff, R1
 	tst	LevelsInc
 	bne	10$
-	movb	#1, @#Msg003
-	movb	#2, @#Msg003+3
+	mov	#SprOffOn, R1
+10$:	mov	#9., R3
+20$:	mov	#10., R2
+30$:	movb	(R1)+, (R0)+
+	sob	R2, 30$
+	add	#SCRWID-10., R0
+	sob	R3, 20$
+	return
+
+
+
+; ZX0 v2.2 standart unpacker
+; original ZX0 encoder/decoder (c) Einar Saukas & Urusergi
+; PDP11 version by reddie, 02-may-2024 (upd)
+Unpack:	clr	R2
+	movb	#200, R3
+	sxt	R5
+10$:	call	50$
+	movb	(R0)+, (R1)+
+	sob	R2, .-2
+	aslb	R3
+	bcs	30$
+	call	50$
+20$:	mov	R1, R4
+	add	R5, R4
+	movb	(R4)+, (R1)+
+	sob	R2, .-2
+	aslb	R3
+	bcc	10$
+30$:	mov	#-2, R2
+	call	60$
+	incb	R2
+	bne	.+4
+40$:	return
+	swab	R2
+	mov	R2, R5
+	clrb	R5
+	bisb	(R0)+, R5
+	asr	R5
+	mov	#1, R2
+	bcs	.+6
+	call	80$
+	inc	R2
 	br	20$
-10$:	movb	#2, @#Msg003
-	movb	#1, @#Msg003+3
-20$:	mov	#Msg003, R0
-	mov	#70.*64.+30.+VADDR, R1
-	call	PrintStr
-	return
-
-
-; lzsa3 decompressing routines by manwe & ivanq
-; https://github.com/imachug/lzsa3
-; R1 = Source, R2 = Dest addrs
-
-Unpack:	clr	R5		; no nibbles sign
-10$:	movb	(R1)+, R3	; Token = 10$, read token
-	mov	R3, R0
-	bic	#177774, R0	; get 2 bits
-	beq	30$		; Decode = 30$
-	cmp	R0, #3		; literals length
-	bne	20$		; Copy = 20$
-	call	110$
-20$:	movb	(R1)+, (R2)+	; literals length in R0
-	sob	R0, 20$
-30$:	mov	R3, -(SP)
-	rolb	R3		; get 2 bits
-	rol	R0
+50$:	incb	R2
+60$:	aslb	R3
+	bne	70$
+	movb	(R0)+, R3
 	rolb	R3
-	rol	R0
-	asl	R0
-	add	R0, PC		; run subroutine
-	br	90$
-	br	70$
-	br	80$
-	call	100$		; get nibble in R0
-	rolb	R3
-	rol	R0
-	inc	R0
-40$:	mov	R0, R4		; Save = 40$, save offset for future
-50$:	mov	(SP)+, R0	; Match = 50$
-	asr	R0
-	asr	R0
-	bic	#177770, R0	; get 3 bits
-	cmp	R0, #7
-	bne	60$
-	call	110$
-	tstb	R0		; match length
-	beq	140$
-60$:	mov	R2, R3		; Clone = 60$
-	sub	R4, R3
-	movb	(R3)+, (R2)+
-	inc	R0
-1$:	movb	(R3)+, (R2)+
-	sob	R0, 1$
-	br	10$
-70$:	clr	R0		; o9bit = 70$
-	bisb	(R1)+, R0
-	rolb	R3
-	rol	R0
-	inc	R0
-	br	40$
-80$:	call	100$ 		; o13bit = 80$, get nibble in R0
-	rolb	R3
-	rol	R0
-	swab	R0
-	bisb	(R1)+, R0	; 8 bits
-	add	#513., R0
-	br	40$
-90$:	rolb	R3		; oOther = 90$
-	bcs	50$
-	bisb	(R1)+, R0	; read 16 bits
-	swab	R0
-	bisb	(R1)+, R0
-	br	40$
-100$:	com	R5		; Nibble = 100$
-	bmi	2$
-	mov	R5, R0
-	clr	R5
-	br	3$
-2$:	bicb	(R1)+, R5	; read 2 nibbles
-	mov	R5, R0
-	asr	R0
-	asr	R0
-	asr	R0
-	asr	R0
-3$:	bic	#177760,R0	; leave 4 low bits
-	return
-110$:	mov	R0, -(SP)	; Extend = 110$, save original value
-	call	100$ 		; get nibble in R0
-	bne	130$
-	bisb	(R1)+,R0
-	bne	120$
-	; unnecessary for short files
-	bisb	(R1)+, R0	; read high byte
-	swab	R0
-	bisb	(R1)+, R0	; read low byte
-	tst	(SP)+		; skip saved R0
-	return
-120$:	add	#15., R0	; Ext1 = 120$
-130$:	dec	R0		; Ext2 = 130$
-	add	(SP)+, R0	; add original value
-140$:	return			; Exit = 140$
+70$:	bcs	40$
+80$:	aslb	R3
+	rol	R2
+	br	60$
 
 
 ; unpacks background
 DrawBackground:
-	mov	#CpuBgr, R1
-	mov	#40000, R2
+	mov	#CpuBgr, R0
+	mov	#40000, R1
 	call	Unpack
 	return
 
