@@ -555,15 +555,10 @@ CheckTilesAddition:
 	beq	99$
 	clr	Key1	
 	mov	#Snd000, CurrentSound
-	tst	TilesAddition
-	bne	10$
-	mov	#6., TilesAddition
-	br	90$
-10$:	cmp	#6., TilesAddition
-	bne	20$
-	mov	#12., TilesAddition
-	br	90$
-20$:	clr	TilesAddition
+	add	#6., TilesAddition
+	cmp	TilesAddition, #12.
+	blos	90$
+	clr	TilesAddition
 	; redraw stakan/next (stakan only if not at awaiting start mode)
 90$:	cmp	CurrentMode, #1.
 	beq	92$
