@@ -38,6 +38,7 @@ del _cpu_bgr.dat
 del _column.lst
 del _column.mac
 del _cpu.mac
+del _cpu.lst
 
 echo.
 start ..\..\bkemu\BK_x64.exe /C BK-0010-01 /B .\release\column.bin
